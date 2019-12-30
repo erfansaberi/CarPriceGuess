@@ -1,35 +1,43 @@
 #this script collect information from bama.ir and help you guess your car price
 #developed by erfan saberi
 #Special Thanks to Jadi :)
+
 x , y , data , kar = [], [], [], []
+counter = 0
+
 
 lang = input('Select Language  Fa/En  : ')
+
+#Languages
 if lang == 'Fa' or lang =='FA' or lang == 'fa':
     title = 'تخمین قیمت خودرو'
     selectcar = 'از ليست موجود يک ماشين را انتخاب کنيد : '
     selectmodel = 'لطفا از بين مدل هاي موجود انتخاب کنيد : '
     unknowncar = 'ماشين شناخته نشده'
     selectmodelunknown = 'لطفا مدل ماشين مورد نظرتان را وارد کنيد : '
-    howmany = 'چند صفحه اطلاعات جمع کنم ؟ تعداد صفحات بيشتر باعث افزايش دقت نرم افزار ميشود : '
+    howmany = 'در صورت تمایل تعداد صفحات مورد نظرتان را برای اعمال محدودیت وارد کنید : '
     inprogress = '        در حال جمع آوري اطلاعات'
     carpr = 'قیمت ماشین شما حدودا  %i تومان است'
     insertkarkard = 'کارکرد ماشین را به کیلومتر وارد کنید'
     insertyear = 'سال توليد ماشين را وارد کنيد'
     donetext = 'برای استفاده مجدد اینتر بزنید ، در غیر اینصورت با تایپ هر چیزی میتوانید از برنامه خارج شوید'
+    notenough = 'اطلاعات کافی نیست. آیا مایل به ادامه می باشید؟ y/n : '
 if lang == 'En' or lang == 'EN' or lang == 'en':
     title = 'Car Price Guess'
     selectcar = 'Please select a car brand from list : '
     selectmodel = 'Please enter your car model from list : '
     unknowncar = 'Unknown car'
     selectmodelunknown = 'Please insert your car model : '
-    howmany = 'How much of web pages i have to crawl? (give me a number): '
+    howmany = '(Optinal) Give me a number to limit web crawler : '
     inprogress = 'Crawling web pages ...'
     carpr = 'Your car price is around %i'
     insertkarkard = 'how many kilometers this car traveled? : '
     insertyear = 'Please insert your car product year : '
     donetext = 'Press enter for another guess or type something to exit'
-print(title)
+    notenough = 'there isn\'t enough information about your car. would you like to continue? y/n'
 
+
+print(title)
 #ask user for car brand and model
 print('peugeot , kia , pride , bmw , renault')
 cartype = input(selectcar)
@@ -52,7 +60,15 @@ else:
     print(unknowncar)
     carmodel = input(selectmodelunknown)
 
-a = int(input(howmany))
+c = input(howmany)
+try:
+    c = int(c)
+    if c > 0:
+        a = c
+    else:
+      a = 100
+except:
+    a = 100
 
 print('=======================')
 print(inprogress)
@@ -66,9 +82,11 @@ from bs4 import BeautifulSoup
 #Exctracting data from web
 for i in range(1,a+1):
     session = requests.get('https://bama.ir/car/%s/%s/all-trims?hasprice=true&page=%i' % (cartype, carmodel, i))
-    soup = BeautifulSoup(session.text, 'html.parser')
-    res = soup.find_all('div', attrs={'class':'listdata'})
-    
+    if session.url == ('https://bama.ir/car/%s/%s/all-trims?hasprice=true&page=%i' % (cartype, carmodel, i)):
+        soup = BeautifulSoup(session.text, 'html.parser')
+        res = soup.find_all('div', attrs={'class':'listdata'})
+    else:
+        break
     for car in res:
         name = car.find('h2', attrs={'itemprop':'name'})
         name = re.sub(r'\s+', ' ', name.text).strip()
@@ -100,31 +118,51 @@ for i in range(1,a+1):
         cost = re.sub(r' تومان', '', cost)
         cost = re.sub(r',', '', cost)
         if not cost == 'در توضیحات' and not cost == 'حواله' and not cost == 'توافقی':
-            cost = int(cost)
+            try:
+                cost = int(cost)
+            except:
+                cost = 'Unknown'
         if type(cost)==int:
+            print('     ', name, year, work, cost)
             data.append(year)
             data.append(work)
             y.append(cost)
             x.append(data)
             data = []
+            counter += 1
     print('page ', i, 'done')
+print(counter, 'information found')
 print('=======================')
 
-#Fit extracted data on a Decision Tree Classifier
-clf = tree.DecisionTreeClassifier()
-clf = clf.fit(x, y)
 
-def carprice(karkard, sal):
-    price = clf.predict([[sal, karkard]])
-    print(carpr%(price))
+#Start Using ML Library
+def startusingapp():
 
-def checkcarprice():
-    print(title, cartype, carmodel)
-    karkard = input(insertkarkard)
-    sal = input(insertyear)
-    carprice(karkard, sal)
+    #Fit extracted data on a Decision Tree Classifier
+    clf = tree.DecisionTreeClassifier()
+    clf = clf.fit(x, y)
 
-check = ''
-while check == '':
-    checkcarprice()
-    check = input(donetext)
+    #price guess
+    def carprice(karkard, sal):
+        price = clf.predict([[sal, karkard]])
+        print(carpr%(price))
+    
+    #user interface
+    def checkcarprice():
+        print(title, cartype, carmodel)
+        karkard = input(insertkarkard)
+        sal = input(insertyear)
+        carprice(karkard, sal)
+    
+    check = ''
+    while check == '':
+        checkcarprice()
+        check = input(donetext)
+
+#check the informations count
+if counter > 5 :
+    startusingapp()
+else :
+    q = input(notenough)
+    if q == 'y' :
+        startusingapp()
